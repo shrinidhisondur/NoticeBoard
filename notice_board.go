@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"fmt"
 	"time"
 	"log"
 	"net/http"
@@ -198,10 +197,14 @@ type getHandler struct {
 	client *firestore.Client
 }
 
+// getDocuments retrieves documents from Board collection using client @client.
 func getDocuments(client *firestore.Client) []*Document {
 	ctx := context.Background()
-	iter := client.Collection("Wall").Query.OrderBy("Timestamp", firestore.Desc).Documents(ctx)
+	// Get the collection specified in Board, in the order of their
+	// timestamp fields.
+	iter := client.Collection("Board").Query.OrderBy("Timestamp", firestore.Desc).Documents(ctx)
 	defer iter.Stop()
+	// Loop through the documents from the database and add them to @docs.
 	var docs []*Document
 	for {
 		doc, err := iter.Next()
@@ -215,11 +218,14 @@ func getDocuments(client *firestore.Client) []*Document {
 	return docs
 }
 
-func (h *getHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	docs := getDocuments(h.client)
+// display docs using HTML template.
+func displayDocsUsingHTML(w http.ResponseWriter, docs []*Document) {
 	if err := tmpl.Execute(w, docs); err != nil {
 		log.Printf("got error with template: %v", err)
 	}
+}
+
+func (h *getHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type putHandler struct {
@@ -227,24 +233,28 @@ type putHandler struct {
 }
 
 func (h *putHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Get user's fields from the http request.
 	note := r.PostFormValue("note")
 	user := r.PostFormValue("user")
-	log.Printf("Got form: %v, %v", note, user)
-	ref := h.client.Collection("Wall").NewDoc()
+
+	// Make a new document using the parameters given by the user.
+	ref := h.client.Collection("Board").NewDoc()
 	d := &Document{}
 	d.User = user
 	d.Note = note
 	d.Timestamp = time.Now()
 	ctx := context.Background()
+	// Add the document to the database.
 	if _, err := ref.Create(ctx, d); err != nil {
 		log.Printf("ref.Create: %v", err)
 	}
+
+	// Get the documents from the database. 
 	docs := getDocuments(h.client)
-	if err := tmpl.Execute(w, docs); err != nil {
-		log.Printf("put got error with template: %v", err)
-	}
+	displayDocsUsingHTML(w, docs)
 }
 
+// registerHandlers register handlers to handle GET AND POST http requests.
 func registerHandlers(h *getHandler, p *putHandler) {
 	r := mux.NewRouter()
 	r.Methods("GET").Path("/").Handler(h)
@@ -253,28 +263,34 @@ func registerHandlers(h *getHandler, p *putHandler) {
 }
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	if projectID == "" {
 		log.Fatal("GOOGLE_CLOUD_PROJECT must be set")
 	}
 
 	ctx := context.Background()
+	// Firestore is our database, so create a client that can store and
+	// retrieve information for it.
 	client, err := firestore.NewClient(ctx, projectID)
 	if err != nil {
 		log.Fatalf("firestore.NewClient: %v", err)
 	}
+	// Pass the client to both getHandler and putHandler to retrieve
+	// information from the database.
 	h := &getHandler{
 		client,
 	}
 	p := &putHandler {
 		client,
 	}
+	// Register the handles for GET and POST HTTP requests.
 	registerHandlers(h, p)
+
+	// Open HTTP server port and listen for connections on the port.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	log.Printf("Listening on port %s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
