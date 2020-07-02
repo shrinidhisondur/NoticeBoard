@@ -187,6 +187,34 @@ h1 {
 
 var tmpl = template.Must(template.New("t").Parse(tmplStr))
 
+type putHandler struct {
+	client *firestore.Client
+}
+
+func (h *putHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	/*
+	// Get user's fields from the http request.
+	note := r.PostFormValue("note")
+	user := r.PostFormValue("user")
+
+	// Make a new document using the parameters given by the user.
+	ref := h.client.Collection("Board").NewDoc()
+	d := &Document{}
+	d.User = user
+	d.Note = note
+	d.Timestamp = time.Now()
+	ctx := context.Background()
+	// Add the document to the database.
+	if _, err := ref.Create(ctx, d); err != nil {
+		log.Printf("ref.Create: %v", err)
+	}
+	*/
+	// Get the documents from the database. 
+	docs := getDocuments(h.client)
+	displayDocsUsingHTML(w, docs)
+}
+
+
 type Document struct {
 	User string
 	Note string
@@ -226,32 +254,6 @@ func displayDocsUsingHTML(w http.ResponseWriter, docs []*Document) {
 }
 
 func (h *getHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-}
-
-type putHandler struct {
-	client *firestore.Client
-}
-
-func (h *putHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Get user's fields from the http request.
-	note := r.PostFormValue("note")
-	user := r.PostFormValue("user")
-
-	// Make a new document using the parameters given by the user.
-	ref := h.client.Collection("Board").NewDoc()
-	d := &Document{}
-	d.User = user
-	d.Note = note
-	d.Timestamp = time.Now()
-	ctx := context.Background()
-	// Add the document to the database.
-	if _, err := ref.Create(ctx, d); err != nil {
-		log.Printf("ref.Create: %v", err)
-	}
-
-	// Get the documents from the database. 
-	docs := getDocuments(h.client)
-	displayDocsUsingHTML(w, docs)
 }
 
 // registerHandlers register handlers to handle GET AND POST http requests.
